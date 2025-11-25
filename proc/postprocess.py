@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import scipy.interpolate as interp
 import matplotlib.pyplot as plt
+from .signal import Signal
 
 class PostProcess:
     def __init__(self, sim_info=None):
@@ -45,7 +46,7 @@ class PostProcess:
         
         time_domain_road=pd.DataFrame({'Time':road_signal_t, 'Z':road_signal_z})
 
-        road_interp=interp.interp1d(time_domain_road['Time'], time_domain_road['Z'], kind='nearest', fill_value='extrapolate', bounds_error=False)
+        road_interp=interp.interp1d(time_domain_road['Time'], time_domain_road['Z'], kind='linear', fill_value='extrapolate', bounds_error=False)
         road_f=road_interp((time_domain_road['Time'] + self.front_offset/(self.speed*1000)))
         road_r=road_interp((time_domain_road['Time'] + (self.front_offset - self.wheelbase)/(self.speed*1000)))
         self.add_signal('Road_profile_FWC', time_domain_road['Time'], road_f, 'R', None)
@@ -67,15 +68,19 @@ class PostProcess:
 
     def read_abf(self, curve_details, trim=0.3):
         df=pd.read_csv(self.abfp, header=None, skip_blank_lines=False, names=['Time', 'Y'])
+        print(f"Curve data types: {df.dtypes}")
         df['curve_id']=df['Time'].isna().cumsum()
         df=df.dropna().reset_index(drop=True)
         curves_pp=[g.reset_index(drop=True) for _, g in df.groupby('curve_id')]     #curves_pp is a list of dataframes
         num=0
         for (name, dtype, zones), curve in zip(curve_details, curves_pp):
+            print(f"Loading signal: {name}")
             if isinstance(trim, (int, float)):
                 curve=curve[curve['Time']<trim]
             elif isinstance(trim, tuple):
                 curve=curve[(curve['Time']>trim[0]) & (curve['Time']<trim[1])]
+            else:
+                print("Invalid trim parameter")
             self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
             num+=1
         print(f"Loaded {num} signals.")
