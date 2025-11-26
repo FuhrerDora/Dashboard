@@ -29,7 +29,8 @@ sim_info={'abf_path': r"F:\Yugal\python\MBD\data\bump_s400x80_20kph_double.csv",
           'speed': 20, #kmph,
           'road_path': r"F:\Yugal\python\MBD\data\bump_s400x80.rdf",
           'wheelbase': 1350,    #mmyes
-          'Road_origin_FWC_offset': 0}
+          'Road_origin_FWC_offset': 0,
+          'time_step': 0.001}
 
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)

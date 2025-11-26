@@ -13,7 +13,7 @@ class PostProcess:
         self.speed=sim_info['speed']/3.6  #m/s
         self.wheelbase=sim_info['wheelbase']
         self.front_offset=sim_info['Road_origin_FWC_offset']
-
+        self.time_step=sim_info['time_step']
 
     def read_rdf(self):
         if self.roadp is None:
@@ -45,22 +45,44 @@ class PostProcess:
             raise ValueError("No valid road data found in RDF file.")
         
         time_domain_road=pd.DataFrame({'Time':road_signal_t, 'Z':road_signal_z})
+        road_t=[]
+        road_z=[]
+        FWC_t=[]
+        RWC_t=[]
+        c=0
+        for i in range(0, time_domain_road['Time'][-1]+self.time_step, self.time_step):
+            ref_t=time_domain_road['Time'][c+1]
+            road_t.append(i)
+            if i<ref_t:
+                road_z.append(time_domain_road['Z'][c])
+                continue
+            else: 
+                c+=1
+                road_z.append(time_domain_road['Z'][c])
+
+
+            
+
+        FWC_time_offset=self.front_offset/(self.speed*1000)
+        RWC_time_offset=(self.front_offset - self.wheelbase)/(self.speed*1000)
+
 
         road_interp=interp.interp1d(time_domain_road['Time'], time_domain_road['Z'], kind='linear', fill_value='extrapolate', bounds_error=False)
-        road_f=road_interp((time_domain_road['Time'] + self.front_offset/(self.speed*1000)))
-        road_r=road_interp((time_domain_road['Time'] + (self.front_offset - self.wheelbase)/(self.speed*1000)))
+        road_f=road_interp((self.signal_map['Time'] + self.front_offset/(self.speed*1000)))
+        road_r=road_interp((self.signal_map['Time'] + (self.front_offset - self.wheelbase)/(self.speed*1000)))
+        time_domain_road['road_f']=
         self.add_signal('Road_profile_FWC', time_domain_road['Time'], road_f, 'R', None)
         self.add_signal('Road_profile_RWC', time_domain_road['Time'], road_r, 'R', None)
         self.add_signal('Road_profile', time_domain_road['Time'], time_domain_road['Z'], 'R', None)
         print('Road profiles loaded')
-                
+        
     def add_signal(self, name, time, data, dtype, zones=None):
         if dtype=='D':
             data=data*-1
         sig=Signal(name, time, data, dtype, zones)
         self.signals.append(sig)
         self.signal_map[name]=sig
-    
+
     def __getattr__(self, item):
         if item in self.signal_map:
             return self.signal_map[item]
