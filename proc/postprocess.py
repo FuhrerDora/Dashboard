@@ -117,8 +117,11 @@ class PostProcess:
                     ax=axes[ax_index]
                     sig.splot(ax=ax, want_zones=want_zones)
                     if sig.name=='Front_travel':
-                        self.Road_profile_FWC.splot(ax=ax)
-                    else: self.Road_profile_RWC.splot(ax=ax)
+                        if self.roadp is not None:
+                            self.Road_profile_FWC.splot(ax=ax)
+                    else: 
+                        if self.roadp is not None:
+                            self.Road_profile_RWC.splot(ax=ax)
                     ax.legend()
                     ax_index+=1
             elif dtype=='R':

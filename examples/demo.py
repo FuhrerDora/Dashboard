@@ -25,15 +25,17 @@ curve_details=[('Front_travel', 'D', [0, 55, 85, 97]),
 curve_details.extend(add_force_signal(fnames))
 curve_details.append(('CG_AZ', 'A', None))
 
-sim_info={'abf_path': r"F:\Yugal\python\MBD\data\tanupost.csv",
+sim_info={'abf_path': r"F:\Yugal\python\MBD\data\bump_s400x80_20kph_double.csv",
           'speed': 20, #kmph,
-          'road_path': r"F:\Yugal\python\MBD\data\road.rdf",
+          'road_path': r"F:\Yugal\python\MBD\data\bump_s400x80.rdf",
           'wheelbase': 1350,    #mmyes
           'Road_origin_FWC_offset': 0}
 
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
-#tanu.plot(want_zones=True)
-tanu.Road_profile_FWC.splot(want_zones=False, alone=True)
+#tanu.plot(want_zones=False)
+tanu.Road_profile.splot(want_zones=False, alone=True)
+tanu.Front_travel.splot(want_zones=True, alone=True)
 plt.show()
+#r"F:\Yugal\python\MBD\data\road.rdf"
