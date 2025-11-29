@@ -1,8 +1,11 @@
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+from pathlib import Path
 from proc import PostProcess, Signal
 from matplotlib import pyplot as plt
+
+ROOT= Path(__file__).resolve().parent.parent
+data=ROOT/ 'data'
 
 def add_force_signal(names):
     forces_temp=[('_FM', 'F', None), 
@@ -25,14 +28,14 @@ curve_details=[('Front_travel', 'D', [0, 55, 85, 97]),
 curve_details.extend(add_force_signal(fnames))
 curve_details.append(('CG_AZ', 'A', None))
 
-sim_info={'abf_path': r"F:\Yugal\python\MBD\data\bump_s400x80_20kph_double.csv",
-          'speed': 20, #kmph,
-          'road_path': r"F:\Yugal\python\MBD\data\bump_s400x80.rdf",
-          'wheelbase': 1350,    #mmyes
+sim_info={'abf_path': data/ "bump_s400x80_20kph_double.csv",
+          'speed': 20, #kmph
+          'road_path': data/ "bump_s400x80.rdf",
+          'wheelbase': 1350,    #mm
           'Road_origin_FWC_offset': 0,
           'time_step': 0.001,
           'trim': 0.3}
-
+        
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
