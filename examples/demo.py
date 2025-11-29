@@ -30,13 +30,14 @@ sim_info={'abf_path': r"F:\Yugal\python\MBD\data\bump_s400x80_20kph_double.csv",
           'road_path': r"F:\Yugal\python\MBD\data\bump_s400x80.rdf",
           'wheelbase': 1350,    #mmyes
           'Road_origin_FWC_offset': 0,
-          'time_step': 0.001}
+          'time_step': 0.001,
+          'trim': 0.3}
 
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
 #tanu.plot(want_zones=False)
-tanu.Road_profile.splot(want_zones=False, alone=True)
-tanu.Front_travel.splot(want_zones=True, alone=True)
+tanu.Road_profile.splot(want_zones=False, alone=False)
+#tanu.Front_travel.splot(want_zones=True, alone=True)
 plt.show()
 #r"F:\Yugal\python\MBD\data\road.rdf"

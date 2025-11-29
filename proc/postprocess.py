@@ -14,6 +14,7 @@ class PostProcess:
         self.wheelbase=sim_info['wheelbase']
         self.front_offset=sim_info['Road_origin_FWC_offset']
         self.time_step=sim_info['time_step']
+        self.trim=sim_info.get('trim', None)
 
     def read_rdf(self):
         if self.roadp is None:
@@ -47,10 +48,8 @@ class PostProcess:
         time_domain_road=pd.DataFrame({'Time':road_signal_t, 'Z':road_signal_z})
         road_t=[]
         road_z=[]
-        FWC_t=[]
-        RWC_t=[]
         c=0
-        for i in range(0, time_domain_road['Time'][-1]+self.time_step, self.time_step):
+        for i in np.arange(0, time_domain_road['Time'].iloc[-1]+self.time_step, self.time_step):
             ref_t=time_domain_road['Time'][c+1]
             road_t.append(i)
             if i<ref_t:
@@ -60,20 +59,24 @@ class PostProcess:
                 c+=1
                 road_z.append(time_domain_road['Z'][c])
 
-
-            
-
         FWC_time_offset=self.front_offset/(self.speed*1000)
+        FWC_rows_offset=int(FWC_time_offset/self.time_step)
         RWC_time_offset=(self.front_offset - self.wheelbase)/(self.speed*1000)
+        RWC_rows_offset=int(RWC_time_offset/self.time_step)
 
+        road=pd.DataFrame({'Time':road_t, 'Z':road_z})
+        road['FWC']=road['Z'].shift(FWC_rows_offset, fill_value=road['Z'][0])
+        road['RWC']=road['Z'].shift(RWC_rows_offset, fill_value=road['Z'][0])
+        if isinstance(self.trim, (int, float)):
+            road=road[road['Time']<self.trim]
+        elif isinstance(self.trim, tuple):
+            road=road[(road['Time']>self.trim[0]) & (road['Time']<self.trim[1])]
+        else:
+            print("Invalid trim parameter")
 
-        road_interp=interp.interp1d(time_domain_road['Time'], time_domain_road['Z'], kind='linear', fill_value='extrapolate', bounds_error=False)
-        road_f=road_interp((self.signal_map['Time'] + self.front_offset/(self.speed*1000)))
-        road_r=road_interp((self.signal_map['Time'] + (self.front_offset - self.wheelbase)/(self.speed*1000)))
-        time_domain_road['road_f']=
-        self.add_signal('Road_profile_FWC', time_domain_road['Time'], road_f, 'R', None)
-        self.add_signal('Road_profile_RWC', time_domain_road['Time'], road_r, 'R', None)
-        self.add_signal('Road_profile', time_domain_road['Time'], time_domain_road['Z'], 'R', None)
+        self.add_signal('Road_profile_FWC', road['Time'], road['FWC'], 'R', None)
+        self.add_signal('Road_profile_RWC', road['Time'], road['RWC'], 'R', None)
+        self.add_signal('Road_profile', road['Time'], road['Z'], 'R', None)
         print('Road profiles loaded')
         
     def add_signal(self, name, time, data, dtype, zones=None):
@@ -88,7 +91,7 @@ class PostProcess:
             return self.signal_map[item]
         raise AttributeError(f"'PostProcess' object has no attribute '{item}'")
 
-    def read_abf(self, curve_details, trim=0.3):
+    def read_abf(self, curve_details):
         df=pd.read_csv(self.abfp, header=None, skip_blank_lines=False, names=['Time', 'Y'])
         print(f"Curve data types: {df.dtypes}")
         df['curve_id']=df['Time'].isna().cumsum()
@@ -97,10 +100,10 @@ class PostProcess:
         num=0
         for (name, dtype, zones), curve in zip(curve_details, curves_pp):
             print(f"Loading signal: {name}")
-            if isinstance(trim, (int, float)):
-                curve=curve[curve['Time']<trim]
-            elif isinstance(trim, tuple):
-                curve=curve[(curve['Time']>trim[0]) & (curve['Time']<trim[1])]
+            if isinstance(self.trim, (int, float)):
+                curve=curve[curve['Time']<self.trim]
+            elif isinstance(self.trim, tuple):
+                curve=curve[(curve['Time']>self.trim[0]) & (curve['Time']<self.trim[1])]
             else:
                 print("Invalid trim parameter")
             self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
