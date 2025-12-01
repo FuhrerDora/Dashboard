@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import scipy.interpolate as interp
+from scipy.integrate import cumulative_trapezoid
 import matplotlib.pyplot as plt
 from .signal import Signal
 
@@ -28,7 +29,7 @@ class PostProcess:
                 break
         if data_start is None:
             raise ValueError("No XZ_DATA found in RDF file.")
-        road_signal_t=[]
+        road_signal_x=[]
         road_signal_z=[]
         for line in text[data_start:]:
             parts=line.strip().split()
@@ -39,28 +40,33 @@ class PostProcess:
                 z=float(parts[1])
             except ValueError:
                 continue
-
-            road_signal_t.append((x/1000)/self.speed) 
+            road_signal_x.append(x)
             road_signal_z.append(z)
-        if not road_signal_t:
+
+        for i in self.signal_map: 
+            if i.name=='Velocity_Curve':
+                vel_signal=i
+        dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
+            
+        
+        if not road_signal_x:
             raise ValueError("No valid road data found in RDF file.")
         
-        time_domain_road=pd.DataFrame({'Time':road_signal_t, 'Z':road_signal_z})
+        road_raw=pd.DataFrame({'X':road_signal_x, 'Z':road_signal_z})
 
-        road_t =[ i for i in np.arange(0, time_domain_road['Time'].iloc[-1]+self.step_size, self.step_size)]
         c = 0
         road_z=[]
-        for i in road_t:
-            while c< len(time_domain_road['Time'])-1 and time_domain_road['Time'].iloc[c]<i:
+        for i in range(len(vel_signal.time)):
+            if c<len(road_raw['X']) and road_raw['X'][c]<vel_signal.data[i]:
                 c+=1
-            road_z.append(time_domain_road['Z'].iloc[c])
+            road_z.append(road_raw['Z'][c])
 
         FWC_time_offset=-self.front_offset/(self.speed*1000)
         FWC_rows_offset=int(FWC_time_offset/self.step_size)
         RWC_time_offset=(self.front_offset - self.wheelbase)/(self.speed*1000)
         RWC_rows_offset=int(RWC_time_offset/self.step_size)
 
-        road=pd.DataFrame({'Time':road_t, 'Z':road_z})
+        road=pd.DataFrame({'Time':vel_signal.time, 'Z':road_z})
         road['FWC']=road['Z'].shift(FWC_rows_offset, fill_value=road['Z'].iloc[0])
         road['RWC']=road['Z'].shift(RWC_rows_offset, fill_value=road['Z'].iloc[0])
         if isinstance(self.trim, (int, float)):
