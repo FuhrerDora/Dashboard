@@ -46,11 +46,6 @@ class PostProcess:
             raise ValueError("No valid road data found in RDF file.")
         
         time_domain_road=pd.DataFrame({'Time':road_signal_t, 'Z':road_signal_z})
-        print("Raw RDF max time:", time_domain_road['Time'].max())
-        plt.plot(time_domain_road['Time'], time_domain_road['Z'])
-        plt.title("Raw RDF Data – BEFORE RESAMPLING")
-        plt.show()
-
 
         road_t =[ i for i in np.arange(0, time_domain_road['Time'].iloc[-1]+self.step_size, self.step_size)]
         c = 0
@@ -60,7 +55,7 @@ class PostProcess:
                 c+=1
             road_z.append(time_domain_road['Z'].iloc[c])
 
-        FWC_time_offset=self.front_offset/(self.speed*1000)
+        FWC_time_offset=-self.front_offset/(self.speed*1000)
         FWC_rows_offset=int(FWC_time_offset/self.step_size)
         RWC_time_offset=(self.front_offset - self.wheelbase)/(self.speed*1000)
         RWC_rows_offset=int(RWC_time_offset/self.step_size)

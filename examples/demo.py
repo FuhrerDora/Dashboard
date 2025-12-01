@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 from proc import PostProcess, Signal
 from matplotlib import pyplot as plt
+#& C:/Users/Karthik/AppData/Local/Programs/Python/Python313/python.exe -m examples.demo
 
 ROOT= Path(__file__).resolve().parent.parent
 data=ROOT/ 'data'
@@ -31,8 +32,8 @@ curve_details.append(('CG_AZ', 'A', None))
 sim_info={'abf_path': data/ "bump_s400x80_20kph_double.csv",
           'speed': 20, #kmph   
           'road_path': data/ "bump_s400x80.rdf",
-          'wheelbase': 1350,    #mm
-          'Road_origin_FWC_offset': 0,
+          'wheelbase': 1344,    #mm
+          'Road_origin_FWC_offset': 1631.1578,
           'time_step': 0.001,
           'trim': None}
         
