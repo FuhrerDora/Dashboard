@@ -13,7 +13,7 @@ class PostProcess:
         self.speed=sim_info['speed']/3.6  #m/s
         self.wheelbase=sim_info['wheelbase']
         self.front_offset=sim_info['Road_origin_FWC_offset']
-        self.time_step=sim_info['time_step']
+        self.step_size=sim_info['time_step']
         self.trim=sim_info.get('trim', None)
 
     def read_rdf(self):
@@ -46,27 +46,28 @@ class PostProcess:
             raise ValueError("No valid road data found in RDF file.")
         
         time_domain_road=pd.DataFrame({'Time':road_signal_t, 'Z':road_signal_z})
-        road_t=[]
+        print("Raw RDF max time:", time_domain_road['Time'].max())
+        plt.plot(time_domain_road['Time'], time_domain_road['Z'])
+        plt.title("Raw RDF Data – BEFORE RESAMPLING")
+        plt.show()
+
+
+        road_t =[ i for i in np.arange(0, time_domain_road['Time'].iloc[-1]+self.step_size, self.step_size)]
+        c = 0
         road_z=[]
-        c=0
-        for i in np.arange(0, time_domain_road['Time'].iloc[-1]+self.time_step, self.time_step):
-            ref_t=time_domain_road['Time'][c+1]
-            road_t.append(i)
-            if i<ref_t:
-                road_z.append(time_domain_road['Z'][c])
-                continue
-            else: 
+        for i in road_t:
+            while c< len(time_domain_road['Time'])-1 and time_domain_road['Time'].iloc[c]<i:
                 c+=1
-                road_z.append(time_domain_road['Z'][c])
+            road_z.append(time_domain_road['Z'].iloc[c])
 
         FWC_time_offset=self.front_offset/(self.speed*1000)
-        FWC_rows_offset=int(FWC_time_offset/self.time_step)
+        FWC_rows_offset=int(FWC_time_offset/self.step_size)
         RWC_time_offset=(self.front_offset - self.wheelbase)/(self.speed*1000)
-        RWC_rows_offset=int(RWC_time_offset/self.time_step)
+        RWC_rows_offset=int(RWC_time_offset/self.step_size)
 
         road=pd.DataFrame({'Time':road_t, 'Z':road_z})
-        road['FWC']=road['Z'].shift(FWC_rows_offset, fill_value=road['Z'][0])
-        road['RWC']=road['Z'].shift(RWC_rows_offset, fill_value=road['Z'][0])
+        road['FWC']=road['Z'].shift(FWC_rows_offset, fill_value=road['Z'].iloc[0])
+        road['RWC']=road['Z'].shift(RWC_rows_offset, fill_value=road['Z'].iloc[0])
         if isinstance(self.trim, (int, float)):
             road=road[road['Time']<self.trim]
         elif isinstance(self.trim, tuple):
@@ -74,8 +75,8 @@ class PostProcess:
         else:
             print("Invalid trim parameter")
 
-        self.add_signal('Road_profile_FWC', road['Time'], road['FWC'], 'R', None)
-        self.add_signal('Road_profile_RWC', road['Time'], road['RWC'], 'R', None)
+        self.add_signal('RF', road['Time'], road['FWC'], 'R', None)
+        self.add_signal('RR', road['Time'], road['RWC'], 'R', None)
         self.add_signal('Road_profile', road['Time'], road['Z'], 'R', None)
         print('Road profiles loaded')
         
@@ -99,7 +100,7 @@ class PostProcess:
         curves_pp=[g.reset_index(drop=True) for _, g in df.groupby('curve_id')]     #curves_pp is a list of dataframes
         num=0
         for (name, dtype, zones), curve in zip(curve_details, curves_pp):
-            print(f"Loading signal: {name}")
+            #print(f"Loading signal: {name}")
             if isinstance(self.trim, (int, float)):
                 curve=curve[curve['Time']<self.trim]
             elif isinstance(self.trim, tuple):
@@ -143,10 +144,10 @@ class PostProcess:
                     sig.splot(ax=ax, want_zones=want_zones)
                     if sig.name=='Front_travel':
                         if self.roadp is not None:
-                            self.Road_profile_FWC.splot(ax=ax)
+                            self.RF.splot(ax=ax)
                     else: 
                         if self.roadp is not None:
-                            self.Road_profile_RWC.splot(ax=ax)
+                            self.RR.splot(ax=ax)
                     ax.legend()
                     ax_index+=1
             elif dtype=='R':
