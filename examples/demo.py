@@ -24,7 +24,8 @@ def add_force_signal(names):
     return forces
 
 fnames=['HT', 'SP', 'RSU']
-curve_details=[('Front_travel', 'D', [0, 55, 85, 97]),
+curve_details=[('Vehicle_speed', 'I', None),
+               ('Front_travel', 'D', [0, 55, 85, 97]),
                ('Rear_travel', 'D', [0, 32, 70, 82])]
 curve_details.extend(add_force_signal(fnames))
 curve_details.append(('CG_AZ', 'A', None))

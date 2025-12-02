@@ -43,9 +43,7 @@ class PostProcess:
             road_signal_x.append(x)
             road_signal_z.append(z)
 
-        for i in self.signal_map: 
-            if i.name=='Velocity_Curve':
-                vel_signal=i
+        vel_signal=self.signal_map.get('Vehicle_speed', None)
         dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
             
         
@@ -57,13 +55,13 @@ class PostProcess:
         c = 0
         road_z=[]
         for i in range(len(vel_signal.time)):
-            if c<len(road_raw['X']) and road_raw['X'][c]<vel_signal.data[i]:
+            while c<len(road_raw['X'])-1 and road_raw['X'][c]<dist[i]:
                 c+=1
             road_z.append(road_raw['Z'][c])
 
         FWC_time_offset=-self.front_offset/(self.speed*1000)
         FWC_rows_offset=int(FWC_time_offset/self.step_size)
-        RWC_time_offset=(self.front_offset - self.wheelbase)/(self.speed*1000)
+        RWC_time_offset=-(self.front_offset - self.wheelbase)/(self.speed*1000)
         RWC_rows_offset=int(RWC_time_offset/self.step_size)
 
         road=pd.DataFrame({'Time':vel_signal.time, 'Z':road_z})
@@ -89,27 +87,32 @@ class PostProcess:
         self.signal_map[name]=sig
 
     def __getattr__(self, item):
-        if item in self.signal_map:
+        if "signal_map" in self.__dict__ and item in self.signal_map:
             return self.signal_map[item]
         raise AttributeError(f"'PostProcess' object has no attribute '{item}'")
 
     def read_abf(self, curve_details):
         df=pd.read_csv(self.abfp, header=None, skip_blank_lines=False, names=['Time', 'Y'])
-        print(f"Curve data types: {df.dtypes}")
+        #print(f"Curve data types: {df.dtypes}")
         df['curve_id']=df['Time'].isna().cumsum()
         df=df.dropna().reset_index(drop=True)
         curves_pp=[g.reset_index(drop=True) for _, g in df.groupby('curve_id')]     #curves_pp is a list of dataframes
         num=0
         for (name, dtype, zones), curve in zip(curve_details, curves_pp):
             #print(f"Loading signal: {name}")
-            if isinstance(self.trim, (int, float)):
-                curve=curve[curve['Time']<self.trim]
-            elif isinstance(self.trim, tuple):
-                curve=curve[(curve['Time']>self.trim[0]) & (curve['Time']<self.trim[1])]
-            else:
-                print("Invalid trim parameter")
-            self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
-            num+=1
+            if not self.trim:
+                print("No trim")
+                self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
+                num+=1
+            else:    
+                if isinstance(self.trim, (int, float)):
+                    curve=curve[curve['Time']<self.trim]
+                elif isinstance(self.trim, tuple):
+                    curve=curve[(curve['Time']>self.trim[0]) & (curve['Time']<self.trim[1])]
+                    self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
+                    num+=1
+                else:
+                    print("Check_trim_inputs")
         print(f"Loaded {num} signals.")
 
     def plot(self, names=None, want_zones=True):
@@ -151,9 +154,9 @@ class PostProcess:
                             self.RR.splot(ax=ax)
                     ax.legend()
                     ax_index+=1
-            elif dtype=='R':
+            elif dtype in ['F', 'M', 'A']:
                 continue
-            else:
+            elif dtype=='I':
                 ax=axes[ax_index]
                 for sig in sigs:
                     sig.splot(ax=ax, want_zones=want_zones)
