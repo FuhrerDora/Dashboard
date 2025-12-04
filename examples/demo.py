@@ -1,7 +1,7 @@
 import sys
 import os
 from pathlib import Path
-from proc import PostProcess, Signal
+from proc import PostProcess, Signal, Viz
 from matplotlib import pyplot as plt
 #& C:/Users/Karthik/AppData/Local/Programs/Python/Python313/python.exe -m examples.demo
 
@@ -29,8 +29,13 @@ curve_details=[('Vehicle_speed', 'I', None),
                ('Rear_travel', 'D', [0, 32, 70, 82])]
 curve_details.extend(add_force_signal(fnames))
 curve_details.append(('CG_AZ', 'A', None))
+curve_details.extend([('FWC_X', 'I', None),
+                      ('FWC_Z', 'I', None),
+                      ('RWC_X', 'I', None),
+                      ('RWC_Z', 'I', None)])
 
-sim_info={'abf_path': data/ "bump_s400x80_20kph_double.csv",
+sim_info={'name': 'tanu',
+          'abf_path': data/ "bump_s400x80_20kph_double.csv",
           'speed': 20, #kmph   
           'road_path': data/ "bump_s400x80.rdf",
           'wheelbase': 1344,    #mm
@@ -41,8 +46,6 @@ sim_info={'abf_path': data/ "bump_s400x80_20kph_double.csv",
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
-tanu.plot(want_zones=False)
-#tanu.Road_profile.splot(want_zones=False, alone=False)
-#tanu.Front_travel.splot(want_zones=True, alone=True)
-plt.show()
-#r"F:\Yugal\python\MBD\data\road.rdf"
+dash1=Viz([tanu])
+dash1.viz1(overlay=True)
+#dash1.plot()

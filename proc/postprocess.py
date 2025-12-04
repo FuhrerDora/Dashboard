@@ -5,8 +5,10 @@ from scipy.integrate import cumulative_trapezoid
 import matplotlib.pyplot as plt
 from .signal import Signal
 
+
 class PostProcess:
     def __init__(self, sim_info=None):
+        self.name=sim_info['name']
         self.signals=[]
         self.signal_map={}
         self.abfp=sim_info['abf_path']
@@ -16,6 +18,7 @@ class PostProcess:
         self.front_offset=sim_info['Road_origin_FWC_offset']
         self.step_size=sim_info['time_step']
         self.trim=sim_info.get('trim', None)
+        self.dtype_map={}
 
     def read_rdf(self):
         if self.roadp is None:
@@ -44,6 +47,8 @@ class PostProcess:
             road_signal_z.append(z)
 
         vel_signal=self.signal_map.get('Vehicle_speed', None)
+        if vel_signal is None:
+            raise ValueError("Vehicle_speed signal not found.")
         dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
             
         
@@ -67,12 +72,13 @@ class PostProcess:
         road=pd.DataFrame({'Time':vel_signal.time, 'Z':road_z})
         road['FWC']=road['Z'].shift(FWC_rows_offset, fill_value=road['Z'].iloc[0])
         road['RWC']=road['Z'].shift(RWC_rows_offset, fill_value=road['Z'].iloc[0])
+        if not self.trim:
+            print('No road trimming')
+            pass
         if isinstance(self.trim, (int, float)):
             road=road[road['Time']<self.trim]
         elif isinstance(self.trim, tuple):
             road=road[(road['Time']>self.trim[0]) & (road['Time']<self.trim[1])]
-        else:
-            print("Invalid trim parameter")
 
         self.add_signal('RF', road['Time'], road['FWC'], 'R', None)
         self.add_signal('RR', road['Time'], road['RWC'], 'R', None)
@@ -85,6 +91,8 @@ class PostProcess:
         sig=Signal(name, time, data, dtype, zones)
         self.signals.append(sig)
         self.signal_map[name]=sig
+        self.dtype_map.setdefault(sig.dtype, []).append(sig)
+
 
     def __getattr__(self, item):
         if "signal_map" in self.__dict__ and item in self.signal_map:
@@ -101,7 +109,6 @@ class PostProcess:
         for (name, dtype, zones), curve in zip(curve_details, curves_pp):
             #print(f"Loading signal: {name}")
             if not self.trim:
-                print("No trim")
                 self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
                 num+=1
             else:    
@@ -109,60 +116,7 @@ class PostProcess:
                     curve=curve[curve['Time']<self.trim]
                 elif isinstance(self.trim, tuple):
                     curve=curve[(curve['Time']>self.trim[0]) & (curve['Time']<self.trim[1])]
-                    self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
                     num+=1
-                else:
-                    print("Check_trim_inputs")
+                self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
         print(f"Loaded {num} signals.")
 
-    def plot(self, names=None, want_zones=True):
-        if names is None:
-            selected=self.signals
-        else:
-            selected=[s for s in self.signals if s.name in names]
-            if not selected:
-                print("No matching signals found.")
-                return
-
-        dtype_groups={}
-        for sig in selected:
-            dtype_groups.setdefault(sig.dtype, []).append(sig)
-
-        n=0
-        for dtype, sigs in dtype_groups.items():
-            if dtype=='D':
-                n+=len(sigs)
-            else: 
-                n+=1
-
-        fig, axes=plt.subplots(n, 1, figsize=(12, 4*n), sharex=False)
-
-        if n==1:
-            axes=[axes]
-        
-        ax_index=0
-        for dtype, sigs in dtype_groups.items():
-            if dtype=='D':
-                for sig in sigs:
-                    ax=axes[ax_index]
-                    sig.splot(ax=ax, want_zones=want_zones)
-                    if sig.name=='Front_travel':
-                        if self.roadp is not None:
-                            self.RF.splot(ax=ax)
-                    else: 
-                        if self.roadp is not None:
-                            self.RR.splot(ax=ax)
-                    ax.legend()
-                    ax_index+=1
-            elif dtype in ['F', 'M', 'A']:
-                continue
-            elif dtype=='I':
-                ax=axes[ax_index]
-                for sig in sigs:
-                    sig.splot(ax=ax, want_zones=want_zones)
-                    
-                ax.grid(True)
-                ax.legend()
-                ax_index+=1
-        plt.tight_layout()
-        plt.show()
