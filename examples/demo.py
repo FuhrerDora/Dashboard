@@ -29,6 +29,10 @@ curve_details=[('Vehicle_speed', 'I', None),
                ('Rear_travel', 'D', [0, 32, 70, 82])]
 curve_details.extend(add_force_signal(fnames))
 curve_details.append(('CG_AZ', 'A', None))
+curve_details.extend([('FWC_X', 'I', None),
+                      ('FWC_Z', 'I', None),
+                      ('RWC_X', 'I', None),
+                      ('RWC_Z', 'I', None)])
 
 sim_info={'name': 'tanu',
           'abf_path': data/ "bump_s400x80_20kph_double.csv",
