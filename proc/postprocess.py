@@ -18,7 +18,58 @@ class PostProcess:
         self.front_offset=sim_info['Road_origin_FWC_offset']
         self.step_size=sim_info['time_step']
         self.trim=sim_info.get('trim', None)
+        self.rolling_radius=sim_info['rolling_radius']
         self.dtype_map={}
+
+    def time_resample(self, array):  #first column of input array should be in time domain
+        new=[]
+        v=self.signal_map.get('Vehicle_speed', None)
+        t=v.time
+        c=0
+        for i in t:
+            if i<array[0, 0]:
+                raise ValueError("time less than 0 in input array in time_resample")
+            
+            
+
+
+    def x2t(self, x_vals):  #converts to tme domain and adds time as first column 
+        vel_signal=self.signal_map.get('Vehicle_speed', None)
+        if vel_signal is None:
+            raise ValueError("Vehicle_speed signal not found in x2t call")
+        dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
+        out=[]
+        c=0
+        for i in x_vals:
+            if i>dist.iloc[-1] or i<dist.iloc[0]:
+                raise ValueError("x value out of bounds in x2t")
+            while i<dist.iloc[c]:
+                c+=1
+            out.append(vel_signal.time[c])
+        out=np.column_stack((out, x_vals))
+        return out
+                
+    def wc_path(self):
+        vel_signal=self.signal_map.get('Vehicle_speed', None)
+        if vel_signal is None:
+            raise ValueError("Vehicle_speed signal not found.")
+        dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
+
+        fwc_x=[]
+        rwc_x=[]
+        for i in range(self.time.size):
+            fwc_x.append(dist[i]+self.front_offset-self.signal_map['FWC_X'].data[i])
+            rwc_x.append(dist[i]+self.front_offset - self.wheelbase - self.signal_map['RWC_X'].data[i])
+
+        fwc_xz=np.column_stack(fwc_t, fwc_x, self.signal_map['FWC_Z'].data)
+        rwc_xz=np.column_stack(rwc_t, rwc_x, self.signal_map['RWC_Z'].data)
+
+        fwc_txz=self.x2t(fwc_xz)
+        rwc_txz=self.x2t(rwc_xz)
+
+        for i in vel_signal.time:
+            x=self.x
+
 
     def read_rdf(self):
         if self.roadp is None:

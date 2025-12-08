@@ -41,11 +41,12 @@ sim_info={'name': 'tanu',
           'wheelbase': 1344,    #mm
           'Road_origin_FWC_offset': 1631.1578,
           'time_step': 0.001,
-          'trim': None}
+          'trim': None,
+          'rolling_radius': 233.5}
         
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
 dash1=Viz([tanu])
 #dash1.plot(dtypes=['D', 'F'])
-dash1.viz2()
+dash1.plot(signals=['RF', 'RR'])
