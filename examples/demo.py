@@ -47,6 +47,7 @@ sim_info={'name': 'tanu',
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
+tanu.wc_path()
 dash1=Viz([tanu])
 #dash1.plot(dtypes=['D', 'F'])
-dash1.plot(signals=['RF', 'RR'])
+dash1.plot(signals=['FWC_path', 'RWC_path'])

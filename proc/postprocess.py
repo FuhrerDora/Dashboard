@@ -21,32 +21,36 @@ class PostProcess:
         self.rolling_radius=sim_info['rolling_radius']
         self.dtype_map={}
 
-    def time_resample(self, array):  #first column of input array should be in time domain
-        new=[]
+    def time_resample(self, array):  #first column of input array should be in time domain and must be a df
+        new=array.drop(array.columns[0], axis=1)
+        new_t=v.time
         v=self.signal_map.get('Vehicle_speed', None)
-        t=v.time
         c=0
-        for i in t:
-            if i<array[0, 0]:
-                raise ValueError("time less than 0 in input array in time_resample")
-            
-            
+        for i, t in enumerate(array[:, 0]):
+            if new_t[c]>t:
+                raise ValueError("Time value out of bounds in time_resample")
+            while v.time[c]<t:
+                new=np.vstack((new[:i+1], new[i], new[i+1:]))
+                c+=1
+        new.insert(0, 'Time', new_t)
+        return new
 
-
-    def x2t(self, x_vals):  #converts to tme domain and adds time as first column 
+    def x2t(self, x_vals, col_idx):  #converts to tme domain and adds time as first column 
         vel_signal=self.signal_map.get('Vehicle_speed', None)
         if vel_signal is None:
             raise ValueError("Vehicle_speed signal not found in x2t call")
         dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
-        out=[]
+        dvt=[vel_signal.time, dist]        
         c=0
-        for i in x_vals:
-            if i>dist.iloc[-1] or i<dist.iloc[0]:
-                raise ValueError("x value out of bounds in x2t")
-            while i<dist.iloc[c]:
+        out=x_vals
+        for x in x_vals[:, col_idx]:
+            if x<dvt[1][c]:
+                print('breaking')
+                break
+            while x>=dvt[1][c] and c<len(dvt[0])-1:
+                out=np.vstack((out[:c+1], out[c], out[c+1:]))
                 c+=1
-            out.append(vel_signal.time[c])
-        out=np.column_stack((out, x_vals))
+        out=np.hstack((np.transpose(dvt[0]), out))
         return out
                 
     def wc_path(self):
@@ -57,18 +61,24 @@ class PostProcess:
 
         fwc_x=[]
         rwc_x=[]
-        for i in range(self.time.size):
+        for i in range(len(vel_signal.time)):
             fwc_x.append(dist[i]+self.front_offset-self.signal_map['FWC_X'].data[i])
             rwc_x.append(dist[i]+self.front_offset - self.wheelbase - self.signal_map['RWC_X'].data[i])
 
-        fwc_xz=np.column_stack(fwc_t, fwc_x, self.signal_map['FWC_Z'].data)
-        rwc_xz=np.column_stack(rwc_t, rwc_x, self.signal_map['RWC_Z'].data)
+        fwc_xz=np.column_stack([fwc_x, self.signal_map['FWC_Z'].data])
+        rwc_xz=np.column_stack([rwc_x, self.signal_map['RWC_Z'].data])
 
-        fwc_txz=self.x2t(fwc_xz)
-        rwc_txz=self.x2t(rwc_xz)
+        fwc_txz=self.x2t(fwc_xz, 0)
+        rwc_txz=self.x2t(rwc_xz, 0)
 
-        for i in vel_signal.time:
-            x=self.x
+        fwc_txz=pd.DataFrame()
+        rwc_txz=pd.DataFrame()
+        fwc_txz=self.time_resample(fwc_txz)
+        rwc_txz=self.time_resample(rwc_txz)
+
+        self.add_signal('FWC_path', fwc_txz[:, 0], fwc_txz[:, 1:], 'P', None)
+        self.add_signal('RWC_path', rwc_txz[:, 0], rwc_txz[:, 1:], 'P', None)
+        print('Wheel center paths loaded')
 
 
     def read_rdf(self):
