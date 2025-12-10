@@ -42,12 +42,13 @@ sim_info={'name': 'tanu',
           'Road_origin_FWC_offset': 1631.1578,
           'time_step': 0.001,
           'trim': None,
-          'rolling_radius': 233.5}
+          'rolling_radius': 10}
         
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
 tanu.wc_path()
 dash1=Viz([tanu])
+dash1.viz1(overlay=True)
 #dash1.plot(dtypes=['D', 'F'])
-dash1.plot(signals=['FWC_path', 'RWC_path'])
+#dash1.plot(signals=['FWC_path', 'RR', 'Road_profile'])

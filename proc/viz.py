@@ -23,9 +23,9 @@ class Viz:
             elif overlay:
                 fig=make_subplots(rows=1, cols=2)
                 fig.add_trace(go.Scatter(x=self.sims[0].RF.time, y=self.sims[0].RF.data, mode='lines', name=self.sims[0].RF.name), row=1, col=1)
-                fig.add_trace(go.Scatter(x=self.sims[0].Front_travel.time, y=self.sims[0].Front_travel.data, mode='lines', name=self.sims[0].Front_travel.name), row=1, col=1)
+                fig.add_trace(go.Scatter(x=self.sims[0].FWC_path.time, y=self.sims[0].FWC_path.data, mode='lines', name=self.sims[0].FWC_path.name), row=1, col=1)
                 fig.add_trace(go.Scatter(x=self.sims[0].RR.time, y=self.sims[0].RR.data, mode='lines', name=self.sims[0].RR.name), row=1, col=2)
-                fig.add_trace(go.Scatter(x=self.sims[0].Rear_travel.time, y=self.sims[0].Rear_travel.data, mode='lines', name=self.sims[0].Rear_travel.name), row=1, col=2)
+                fig.add_trace(go.Scatter(x=self.sims[0].RWC_path.time, y=self.sims[0].RWC_path.data, mode='lines', name=self.sims[0].RWC_path.name), row=1, col=2)
         else:
             fig=make_subplots(rows=len(self.sims), cols=2)
             sim_idx=1   #plotly is 1 indexed
@@ -41,7 +41,7 @@ class Viz:
                     fig.add_trace(go.Scatter(x=sim.RR.time, y=sim.RR.data, mode='lines', name=sim.name+'_RR'), row=sim_idx, col=2)
                     fig.add_trace(go.Scatter(x=sim.Rear_travel.time, y=sim.Rear_travel.data, mode='lines', name=sim.name+'_Rear_travel'), row=sim_idx, col=2)
                     sim_idx+=1
-        fig.update_layout(height=600*len(self.sims), width=1000, title_text="Displacement_Only")
+        fig.update_layout(height=600*len(self.sims), width=2000, title_text="Displacement_Only")
         fig.show()
 
     def plot(self, signals=None, dtypes=None):   #unstable

@@ -5,7 +5,6 @@ from scipy.integrate import cumulative_trapezoid
 import matplotlib.pyplot as plt
 from .signal import Signal
 
-
 class PostProcess:
     def __init__(self, sim_info=None):
         self.name=sim_info['name']
@@ -21,10 +20,15 @@ class PostProcess:
         self.rolling_radius=sim_info['rolling_radius']
         self.dtype_map={}
 
-    def time_resample(self, array):  #first column of input array should be in time domain and must be a df
-        new=array.drop(array.columns[0], axis=1)
-        new_t=v.time
+        FWC_time_offset=-self.front_offset/(self.speed*1000)
+        RWC_time_offset=-(self.front_offset - self.wheelbase)/(self.speed*1000)
+        self.FWC_rows_offset=int(FWC_time_offset/self.step_size)
+        self.RWC_rows_offset=int(RWC_time_offset/self.step_size)
+
+    def time_resample(self, array):  #first column of input array should be in time domain      CHECK UNSTABLE
+        new=array[:, 1:]
         v=self.signal_map.get('Vehicle_speed', None)
+        new_t=v.time
         c=0
         for i, t in enumerate(array[:, 0]):
             if new_t[c]>t:
@@ -34,50 +38,40 @@ class PostProcess:
                 c+=1
         new.insert(0, 'Time', new_t)
         return new
-
-    def x2t(self, x_vals, col_idx):  #converts to tme domain and adds time as first column 
-        vel_signal=self.signal_map.get('Vehicle_speed', None)
-        if vel_signal is None:
-            raise ValueError("Vehicle_speed signal not found in x2t call")
-        dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
-        dvt=[vel_signal.time, dist]        
-        c=0
-        out=x_vals
-        for x in x_vals[:, col_idx]:
-            if x<dvt[1][c]:
-                print('breaking')
-                break
-            while x>=dvt[1][c] and c<len(dvt[0])-1:
-                out=np.vstack((out[:c+1], out[c], out[c+1:]))
-                c+=1
-        out=np.hstack((np.transpose(dvt[0]), out))
-        return out
                 
     def wc_path(self):
         vel_signal=self.signal_map.get('Vehicle_speed', None)
         if vel_signal is None:
             raise ValueError("Vehicle_speed signal not found.")
         dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
+        dist_table=np.column_stack([vel_signal.time, dist])
+        dist_df=pd.DataFrame(dist_table)
+        dist_df['fdist']=dist_df[1].shift(self.FWC_rows_offset, fill_value=0)
+        dist_df['rdist']=dist_df[1].shift(self.RWC_rows_offset, fill_value=0)
 
-        fwc_x=[]
-        rwc_x=[]
-        for i in range(len(vel_signal.time)):
-            fwc_x.append(dist[i]+self.front_offset-self.signal_map['FWC_X'].data[i])
-            rwc_x.append(dist[i]+self.front_offset - self.wheelbase - self.signal_map['RWC_X'].data[i])
 
-        fwc_xz=np.column_stack([fwc_x, self.signal_map['FWC_Z'].data])
-        rwc_xz=np.column_stack([rwc_x, self.signal_map['RWC_Z'].data])
+        dist_f=dist+self.front_offset+self.signal_map['FWC_X'].data
+        dist_r=dist+self.front_offset - self.wheelbase + self.signal_map['RWC_X'].data
 
-        fwc_txz=self.x2t(fwc_xz, 0)
-        rwc_txz=self.x2t(rwc_xz, 0)
+        fwc_xz=np.column_stack([dist_f, self.signal_map['FWC_Z'].data + self.rolling_radius])
+        rwc_xz=np.column_stack([dist_r, self.signal_map['RWC_Z'].data + self.rolling_radius])
 
-        fwc_txz=pd.DataFrame()
-        rwc_txz=pd.DataFrame()
-        fwc_txz=self.time_resample(fwc_txz)
-        rwc_txz=self.time_resample(rwc_txz)
+        tf=[]
+        tr=[]
+        for i in range(len(fwc_xz)):
+            f_idx=np.abs(dist_df['fdist']-fwc_xz[i, 0]).argmin()
+            r_idx=np.abs(dist_df['rdist']-rwc_xz[i, 0]).argmin()
+            tf.append(self.signal_map['RF'].time[f_idx])
+            tr.append(self.signal_map['RR'].time[r_idx])
+        
+        tf = np.array(tf).reshape(-1, 1)   # shape (N,1)
+        tr = np.array(tr).reshape(-1, 1)   # shape (N,1)
 
-        self.add_signal('FWC_path', fwc_txz[:, 0], fwc_txz[:, 1:], 'P', None)
-        self.add_signal('RWC_path', rwc_txz[:, 0], rwc_txz[:, 1:], 'P', None)
+        fwc_txz=np.hstack((tf, fwc_xz))
+        rwc_txz=np.hstack((tr, rwc_xz))
+
+        self.add_signal('FWC_path', fwc_txz[:, 0], fwc_txz[:, 2]-fwc_txz[0, 2]+self.rolling_radius, 'P', None)
+        self.add_signal('RWC_path', rwc_txz[:, 0], rwc_txz[:, 2]-rwc_txz[0, 2]+self.rolling_radius, 'P', None)
         print('Wheel center paths loaded')
 
 
@@ -125,14 +119,9 @@ class PostProcess:
                 c+=1
             road_z.append(road_raw['Z'][c])
 
-        FWC_time_offset=-self.front_offset/(self.speed*1000)
-        FWC_rows_offset=int(FWC_time_offset/self.step_size)
-        RWC_time_offset=-(self.front_offset - self.wheelbase)/(self.speed*1000)
-        RWC_rows_offset=int(RWC_time_offset/self.step_size)
-
         road=pd.DataFrame({'Time':vel_signal.time, 'Z':road_z})
-        road['FWC']=road['Z'].shift(FWC_rows_offset, fill_value=road['Z'].iloc[0])
-        road['RWC']=road['Z'].shift(RWC_rows_offset, fill_value=road['Z'].iloc[0])
+        road['FWC']=road['Z'].shift(self.FWC_rows_offset, fill_value=road['Z'].iloc[0])
+        road['RWC']=road['Z'].shift(self.RWC_rows_offset, fill_value=road['Z'].iloc[0])
         if not self.trim:
             print('No road trimming')
             pass
