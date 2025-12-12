@@ -9,21 +9,23 @@ ROOT= Path(__file__).resolve().parent.parent
 data=ROOT/ 'data'
 
 def add_force_signal(names):
-    forces_temp=[('_FM', 'F', None), 
-                ('_FX', 'F', None), 
-                ('_FY', 'F', None),
-                ('_FZ', 'F', None),
-                ('_MM', 'M', None), 
-                ('_MX', 'M', None), 
-                ('_MY', 'M', None), 
-                ('_MZ', 'M', None)]
+    forces_temp=[('_FM', 'F'), 
+                ('_FX', 'F'), 
+                ('_FY', 'F'),
+                ('_FZ', 'F'),
+                ('_MM', 'M'), 
+                ('_MX', 'M'), 
+                ('_MY', 'M'), 
+                ('_MZ', 'M')]
     forces=[]
     for name in names:
+        id=0
         for suffix, dtype, zone in forces_temp:
-            forces.append((name+suffix, dtype, zone))
+            forces.append((name+suffix, dtype, id))
+            id+=1
     return forces
 
-fnames=['HT', 'SP', 'RSU']
+fnames=['HT', 'SP', 'RSU']      #Must be in ascending node_id order
 curve_details=[('Vehicle_speed', 'I', None),
                ('Front_travel', 'D', [0, 55, 85, 97]),
                ('Rear_travel', 'D', [0, 32, 70, 82])]
@@ -42,13 +44,18 @@ sim_info={'name': 'tanu',
           'Road_origin_FWC_offset': 1631.1578,
           'time_step': 0.001,
           'trim': None,
-          'rolling_radius': 10}
+          'rolling_radius': 10,
+          'nodes': {'HT': [1, 10, 0, 10],   #id, x, y, z
+                   'SP': [2, 10, 0, 10],
+                   'RSU':[3, 10, 0, 10]},
+          'events': {'bump': ((0, 0.29), (0.3, 0.5))}}  #start, end. f. r.
         
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
 tanu.read_rdf()
 tanu.wc_path()
 dash1=Viz([tanu])
-dash1.viz1(overlay=True)
-#dash1.plot(dtypes=['D', 'F'])
+#dash1.viz1(overlay=True)
+#dash1.viz2()
 #dash1.plot(signals=['FWC_path', 'RR', 'Road_profile'])
+tanu.load_export()

@@ -4,6 +4,7 @@ import scipy.interpolate as interp
 from scipy.integrate import cumulative_trapezoid
 import matplotlib.pyplot as plt
 from .signal import Signal
+import os
 
 class PostProcess:
     def __init__(self, sim_info=None):
@@ -19,6 +20,8 @@ class PostProcess:
         self.trim=sim_info.get('trim', None)
         self.rolling_radius=sim_info['rolling_radius']
         self.dtype_map={}
+        self.nodes=sim_info['nodes']
+        self.events=sim_info['events']
 
         FWC_time_offset=-self.front_offset/(self.speed*1000)
         RWC_time_offset=-(self.front_offset - self.wheelbase)/(self.speed*1000)
@@ -156,10 +159,13 @@ class PostProcess:
         df=df.dropna().reset_index(drop=True)
         curves_pp=[g.reset_index(drop=True) for _, g in df.groupby('curve_id')]     #curves_pp is a list of dataframes
         num=0
-        for (name, dtype, zones), curve in zip(curve_details, curves_pp):
+        for (name, dtype, meta), curve in zip(curve_details, curves_pp):
             #print(f"Loading signal: {name}")
             if not self.trim:
-                self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
+                if dtype in ['F', 'M']:
+                    self.add_signal(name, curve['Time'], curve['Y'], dtype, node_id=meta)
+                else:
+                    self.add_signal(name, curve['Time'], curve['Y'], dtype, zones=meta)
                 num+=1
             else:    
                 if isinstance(self.trim, (int, float)):
@@ -167,6 +173,72 @@ class PostProcess:
                 elif isinstance(self.trim, tuple):
                     curve=curve[(curve['Time']>self.trim[0]) & (curve['Time']<self.trim[1])]
                     num+=1
-                self.add_signal(name, curve['Time'], curve['Y'], dtype, zones)
+                if dtype in ['F', 'M']:
+                    self.add_signal(name, curve['Time'], curve['Y'], dtype, node_id=meta)
+                else:
+                    self.add_signal(name, curve['Time'], curve['Y'], dtype, zones=meta)
         print(f"Loaded {num} signals.")
+
+    def loads_extract(self, use_FM=True):
+        with open('temp/load_block.txt', 'w') as f:
+            if use_FM:
+                loadcase=1
+                for event, t_unpack in self.events.items():
+                    tf, tr=t_unpack
+                    where='Front'
+                    for i in range(t_unpack):
+                        f.write(f'$ Load Case = {event} {where}')
+                        if where=='Front':
+                            ref_sig=self.signal_map['HT_FM']
+                        else:
+                            ref_sig=self.signal_map['RS_FM']
+                        time=ref_sig.peak(t=tf if where=='Front' else tr)
+                        f.write(f'$ Time Step = {time}')
+                        for key in self.dtype_map.keys():
+                            sigs=[]
+                            if key in ['F', 'M']:
+                                sigs.extend(self.dtype_map[key])
+                        cur_node=1
+                        for sig in sigs:
+                            if sig.node_id is None:
+                                raise ValueError(f'node id is none for signal: {sig.name}')
+                            elif sig.node_id==cur_node:
+                                f.write(sig.name, sig.dtype)
+                                cur_node+=1
+                    
+
+    def load_export(self, name='default'):
+        loads=self.loads_extract()
+        with open('data/'+name, 'w') as f:
+            f.write('''$===================================================
+ $GENERAL INFORMATION: 
+ $    User Name = Yugal
+ $    Time = Fri Dec 16 15:07:22 IST 2022
+ $    MotionView Version = 2022.0.0.33
+ $    MotionView Model File Name = event_pave_40kmph_2R.mdl
+ $    Plot File Name = event_pave_40kmph_2R.plt
+ $    Units = NEWTON/MILLIMETER/KILOGRAM/SECOND
+ $===================================================
+ $
+ $
+$=============Beginning of GRID cards===============
+$
+                  ''')
+            
+            for name, values in self.nodes.items():
+                for id, x, y, z in values:
+                    f.write(f'$ {name}')
+                    f.write(f'GRID,       {id}, ,   {x},      {y},   {z}')
+                    f.write('$')
+
+            f.write('''$================End of GRID cards==================
+$
+$
+$=========Beginning FORCE and MOMENT cards==========
+$''')
+
+            for event in len(self.loads.keys()):
+                f.write()
+
+        os.startfile
 

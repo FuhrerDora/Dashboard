@@ -3,15 +3,24 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 class Signal:
-    def __init__(self, name, time, data, dtype, zones=None):
+    def __init__(self, name, time, data, dtype, zones=None, node_id=None):
         self.name=name
         self.time=time
         self.data=data
         self.dtype=dtype
         self.zones=zones
+        self.step_size=self.time.iloc[1]-self.time.iloc[0]
+        self.node_id=node_id
     
-    def peak(self):
-        return self.data.abs().max()
+    def peak(self, t=None):
+        if not t:
+            val=self.data.abs().max()
+            time_idx=self.data.abs().idxmax()
+            return val, self.time.iloc[time_idx]
+        trimmed=self.data[int(t[0]*1/self.step_size):int(t[1]*(1/self.step_size))]
+        val=trimmed.abs.max()
+        time_idx=trimmed.abs().idxmax()
+        return val, self.time.iloc[time_idx]
     
     def rms(self):
         return np.sqrt(np.mean(self.data**2))
