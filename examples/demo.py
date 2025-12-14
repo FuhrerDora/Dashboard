@@ -18,11 +18,11 @@ def add_force_signal(names):
                 ('_MY', 'M'), 
                 ('_MZ', 'M')]
     forces=[]
+    id=1
     for name in names:
-        id=0
-        for suffix, dtype, zone in forces_temp:
+        for suffix, dtype in forces_temp:
             forces.append((name+suffix, dtype, id))
-            id+=1
+        id+=1
     return forces
 
 fnames=['HT', 'SP', 'RSU']      #Must be in ascending node_id order
@@ -48,7 +48,7 @@ sim_info={'name': 'tanu',
           'nodes': {'HT': [1, 10, 0, 10],   #id, x, y, z
                    'SP': [2, 10, 0, 10],
                    'RSU':[3, 10, 0, 10]},
-          'events': {'bump': ((0, 0.29), (0.3, 0.5))}}  #start, end. f. r.
+          'events': {'bump': [(0, 0.29), (0.3, 0.5)]}}  #start, end. f. r.
         
 tanu=PostProcess(sim_info)
 tanu.read_abf(curve_details)
@@ -58,4 +58,4 @@ dash1=Viz([tanu])
 #dash1.viz1(overlay=True)
 #dash1.viz2()
 #dash1.plot(signals=['FWC_path', 'RR', 'Road_profile'])
-tanu.load_export()
+tanu.loads_export(name='test')
