@@ -27,8 +27,8 @@ def add_force_signal(names):
 
 fnames=['HT', 'SP', 'RSU']      #Must be in ascending node_id order
 curve_details=[('Vehicle_speed', 'I', None),
-               ('Front_travel', 'D', [0, 55, 85, 97]),
-               ('Rear_travel', 'D', [0, 32, 70, 82])]
+               ('Front_travel', 'D', [55, 85, 97]),
+               ('Rear_travel', 'D', [32, 70, 82])]
 curve_details.extend(add_force_signal(fnames))
 curve_details.append(('CG_AZ', 'A', None))
 curve_details.extend([('FWC_X', 'IP', None),
@@ -36,7 +36,7 @@ curve_details.extend([('FWC_X', 'IP', None),
                       ('RWC_X', 'IP', None),
                       ('RWC_Z', 'IP', None)])
 
-sim_info={'name': 'tanu',
+sim_info={'name': 'a1',
           'abf_path': data/ "bump_s400x80_20kph_double.csv",
           'speed': 20, #kmph   
           'road_path': data/ "bump_s400x80.rdf",
@@ -50,12 +50,12 @@ sim_info={'name': 'tanu',
                    'RSU':[3, 10, 0, 10]},
           'events': {'bump': [(0, 0.29), (0.3, 0.5)]}}  #start, end. f. r.
         
-tanu=PostProcess(sim_info)
-tanu.read_abf(curve_details)
-tanu.read_rdf()
-tanu.wc_path()
-dash1=Viz([tanu])
-#dash1.viz1(overlay=True)
-#dash1.viz2()
-#dash1.plot(signals=['FWC_path', 'RR', 'Road_profile'])
-tanu.loads_export(name='test')
+a1=PostProcess(sim_info)
+a1.read_abf(curve_details)
+a1.read_rdf()
+a1.wc_path()
+dash1=Viz([a1])
+dash1.viz1(overlay=True)
+dash1.viz2()
+dash1.plot()
+#a1.loads_export(name='test')

@@ -25,9 +25,10 @@ class PostProcess:
         self.events=sim_info['events']
 
         FWC_time_offset=-self.front_offset/(self.speed*1000)
-        RWC_time_offset=-(self.front_offset - self.wheelbase)/(self.speed*1000)
+        RWC_time_offset=(abs(self.front_offset - self.wheelbase))/(self.speed*1000)
         self.FWC_rows_offset=int(FWC_time_offset/self.step_size)
         self.RWC_rows_offset=int(RWC_time_offset/self.step_size)
+        print(self.FWC_rows_offset, self.RWC_rows_offset)
 
     def time_resample(self, array):  #first column of input array should be in time domain      CHECK UNSTABLE
         new=array[:, 1:]
@@ -48,11 +49,9 @@ class PostProcess:
         if vel_signal is None:
             raise ValueError("Vehicle_speed signal not found.")
         dist=cumulative_trapezoid(vel_signal.data, vel_signal.time, initial=0)
-        dist_table=np.column_stack([vel_signal.time, dist])
-        dist_df=pd.DataFrame(dist_table)
-        dist_df['fdist']=dist_df[1].shift(self.FWC_rows_offset, fill_value=0)
-        dist_df['rdist']=dist_df[1].shift(self.RWC_rows_offset, fill_value=0)
-
+        dist_df=pd.DataFrame({'time': vel_signal.time, 'd': dist})
+        dist_df['fdist']=dist_df['d'].shift(self.FWC_rows_offset, fill_value=0)
+        dist_df['rdist']=dist_df['d'].shift(self.RWC_rows_offset, fill_value=0)
 
         dist_f=dist+self.front_offset+self.signal_map['FWC_X'].data
         dist_r=dist+self.front_offset - self.wheelbase + self.signal_map['RWC_X'].data
@@ -74,8 +73,8 @@ class PostProcess:
         fwc_txz=np.hstack((tf, fwc_xz))
         rwc_txz=np.hstack((tr, rwc_xz))
 
-        self.add_signal('FWC_path', fwc_txz[:, 0], fwc_txz[:, 2]-fwc_txz[0, 2]+self.rolling_radius, 'P', None)
-        self.add_signal('RWC_path', rwc_txz[:, 0], rwc_txz[:, 2]-rwc_txz[0, 2]+self.rolling_radius, 'P', None)
+        self.add_signal('FWC_path', fwc_txz[:, 0], fwc_txz[:, 2], 'P', None)
+        self.add_signal('RWC_path', rwc_txz[:, 0], rwc_txz[:, 2], 'P', None)
         print('Wheel center paths loaded')
 
 
@@ -162,7 +161,7 @@ class PostProcess:
         curves_pp=[g.reset_index(drop=True) for _, g in df.groupby('curve_id')]     #curves_pp is a list of dataframes
         num=0
         for (name, dtype, meta), curve in zip(curve_details, curves_pp):
-            print(f"Loading signal: {name}")
+            #print(f"Loading signal: {name}")
             if not self.trim:
                 if dtype in ['F', 'M']:
                     self.add_signal(name, curve['Time'], curve['Y'], dtype, node_id=meta)

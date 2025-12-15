@@ -9,6 +9,7 @@ class Viz:
         self.all_signals=[]
         for sim in self.sims:
             self.all_signals.append(list(sim.signal_map.values()))
+        self.zone_colors=['green', 'yellow', 'red']
     
     def viz1(self, overlay=False):
         if len(self.sims)==0:
@@ -23,9 +24,22 @@ class Viz:
             elif overlay:
                 fig=make_subplots(rows=1, cols=2)
                 fig.add_trace(go.Scatter(x=self.sims[0].RF.time, y=self.sims[0].RF.data, mode='lines', name=self.sims[0].RF.name), row=1, col=1)
-                fig.add_trace(go.Scatter(x=self.sims[0].FWC_path.time, y=self.sims[0].FWC_path.data, mode='lines', name=self.sims[0].FWC_path.name), row=1, col=1)
+                fig.add_trace(go.Scatter(x=self.sims[0].Front_travel.time, y=self.sims[0].Front_travel.data, mode='lines', name=self.sims[0].FWC_path.name), row=1, col=1)
                 fig.add_trace(go.Scatter(x=self.sims[0].RR.time, y=self.sims[0].RR.data, mode='lines', name=self.sims[0].RR.name), row=1, col=2)
-                fig.add_trace(go.Scatter(x=self.sims[0].RWC_path.time, y=self.sims[0].RWC_path.data, mode='lines', name=self.sims[0].RWC_path.name), row=1, col=2)
+                fig.add_trace(go.Scatter(x=self.sims[0].Rear_travel.time, y=self.sims[0].Rear_travel.data, mode='lines', name=self.sims[0].RWC_path.name), row=1, col=2)
+                y0=0
+                for i in range(3):
+                    fig.add_shape(type='rect', xref='x', yref='y',
+                                    x0=0, x1=self.sims[0].Front_travel.time.iloc[-1],
+                                    y0=y0, y1=y0+1,
+                                    fillcolor=self.zone_colors[i], opacity=0.15, layer='below')
+                    
+                    fig.add_shape(type='rect', xref='x2', yref='y2',
+                                    x0=0, x1=self.sims[0].Front_travel.time.iloc[-1],
+                                    y0=y0, y1=y0+1,
+                                    fillcolor=self.zone_colors[i], opacity=0.15, layer='below')
+                    y0+=1
+
         else:
             fig=make_subplots(rows=len(self.sims), cols=2)
             sim_idx=1   #plotly is 1 indexed
@@ -124,6 +138,38 @@ class Viz:
                     row_idx+=1
         fig.show()              
 
-
+    def viz3(self, overlay=False):
+        if len(self.sims)==0:
+            print("No simulations to visualize.")
+            return
+        elif len(self.sims)==1:
+            if not overlay:
+                fig=go.Figure()
+                for signal in self.all_signals[0]:
+                    if signal.dtype=='D':
+                        fig.add_trace(go.Scatter(x=signal.time, y=signal.data, mode='lines', name=signal.name))
+            elif overlay:
+                fig=make_subplots(rows=1, cols=2)
+                fig.add_trace(go.Scatter(x=self.sims[0].RF.time, y=self.sims[0].RF.data, mode='lines', name=self.sims[0].RF.name), row=1, col=1)
+                fig.add_trace(go.Scatter(x=self.sims[0].FWC_path.time, y=self.sims[0].FWC_path.data, mode='lines', name=self.sims[0].FWC_path.name), row=1, col=1)
+                fig.add_trace(go.Scatter(x=self.sims[0].RR.time, y=self.sims[0].RR.data, mode='lines', name=self.sims[0].RR.name), row=1, col=2)
+                fig.add_trace(go.Scatter(x=self.sims[0].RWC_path.time, y=self.sims[0].RWC_path.data, mode='lines', name=self.sims[0].RWC_path.name), row=1, col=2)
+        else:
+            fig=make_subplots(rows=len(self.sims), cols=2)
+            sim_idx=1   #plotly is 1 indexed
+            if not overlay:
+                for sim in self.sims:
+                    fig.add_trace(go.Scatter(x=sim.Front_travel.time, y=sim.Front_travel.data, mode='lines', name=sim.name+'_Front_travel'), row=sim_idx, col=1)
+                    fig.add_trace(go.Scatter(x=sim.Rear_travel.time, y=sim.Rear_travel.data, mode='lines', name=sim.name+'_Rear_travel'), row=sim_idx, col=2)
+                    sim_idx+=1
+            elif overlay:
+                for sim in self.sims:
+                    fig.add_trace(go.Scatter(x=sim.RF.time, y=sim.RF.data, mode='lines', name=sim.name+'_RF'), row=sim_idx, col=1)
+                    fig.add_trace(go.Scatter(x=sim.Front_travel.time, y=sim.Front_travel.data, mode='lines', name=sim.name+'_Front_travel'), row=sim_idx, col=1)
+                    fig.add_trace(go.Scatter(x=sim.RR.time, y=sim.RR.data, mode='lines', name=sim.name+'_RR'), row=sim_idx, col=2)
+                    fig.add_trace(go.Scatter(x=sim.Rear_travel.time, y=sim.Rear_travel.data, mode='lines', name=sim.name+'_Rear_travel'), row=sim_idx, col=2)
+                    sim_idx+=1
+        fig.update_layout(height=600*len(self.sims), width=2000, title_text="Displacement_Only")
+        fig.show()
     
 
