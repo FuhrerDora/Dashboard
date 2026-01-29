@@ -248,3 +248,39 @@ $''')
 
         os.startfile
 
+class OAEProcessor:
+
+    def __init__(self, postproc):
+        self.postproc = postproc   # your existing object
+        self.dtype_map = postproc.dtype_map
+
+    def build_plots_block(self):
+
+        plots = {}
+
+        for dtype, signals in self.dtype_map.items():
+
+            # Example: only acceleration plots
+            if dtype != "ACC":
+                continue
+
+            for sig in signals:
+
+                plot_name = sig.name   # or derived from metadata
+                side = sig.side        # "LH" or "RH"
+
+                if plot_name not in plots:
+                    plots[plot_name] = {
+                        "LH": None,
+                        "RH": None,
+                        "metrics": {}
+                    }
+
+                plots[plot_name][side] = sig
+
+                # Example metrics
+                plots[plot_name]["metrics"][f"{side} RMS"] = f"{sig.rms:.2f}"
+
+        return plots
+
+
