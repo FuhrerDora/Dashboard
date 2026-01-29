@@ -1,8 +1,7 @@
 from dash import html
 from dash.dependencies import Input, Output
-
 from application.data_provider import OAES
-from application.components import metric_block, lh_rh_row
+from application.components import lh_rh_row
 
 
 def register_callbacks(app):
@@ -11,42 +10,27 @@ def register_callbacks(app):
         Output("page-content", "children"),
         Input("url", "pathname")
     )
-    def render_oae(pathname):
+    def render_dtype_page(pathname):
 
-        if pathname in (None, "/"):
+        if not pathname or pathname == "/":
             return html.Div("Select an OAE from above.")
 
-        oae_name = pathname.replace("/", "")
+        dtype = pathname.strip("/")
 
-        if oae_name not in OAES:
-            return html.Div(f"Unknown OAE: {oae_name}")
+        if dtype not in OAES:
+            return html.Div(f"Unknown OAE: {dtype}")
 
-        oae = OAES[oae_name]
-
-        # ===== SUMMARY METRICS =====
-        summary = html.Div(
-            [
-                metric_block(k, v)
-                for k, v in oae["summary"].items()
-            ],
-            style={
-                "display": "flex",
-                "gap": "15px",
-                "marginBottom": "25px"
-            }
-        )
-
-        # ===== LH / RH ROWS =====
         rows = []
 
-        for plot_name, plot_data in oae["plots"].items():
+        for signal_name, block in OAES[dtype].items():
             rows.append(
                 lh_rh_row(
-                    plot_name,
-                    plot_data.get("LH"),
-                    plot_data.get("RH"),
-                    plot_data.get("metrics", {})
+                    signal_name,
+                    block["Front"]["LH"],
+                    block["Front"]["RH"],
+                    block["Rear"]["LH"],
+                    block["Rear"]["RH"],
                 )
             )
 
-        return html.Div([summary] + rows)
+        return html.Div(rows)

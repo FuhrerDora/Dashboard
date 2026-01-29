@@ -2,97 +2,75 @@ from dash import html, dcc
 import plotly.graph_objects as go
 
 
-# -------------------------------------------------
-# Metric tile
-# -------------------------------------------------
-def metric_block(label, value):
-    return html.Div(
-        [
-            html.Div(label, style={"fontSize": "11px", "color": "#666"}),
-            html.Div(value, style={"fontSize": "20px", "fontWeight": "bold"})
-        ],
-        style={
-            "padding": "10px",
-            "border": "1px solid #ddd",
-            "borderRadius": "6px",
-            "minWidth": "120px"
-        }
-    )
+def overlay_plot(cell, title):
+    """
+    cell = { "ADAMS": Signal, "MV": Signal }
+    """
 
+    if not cell:
+        return html.Div("No data")
 
-# -------------------------------------------------
-# Single signal plot
-# -------------------------------------------------
-def signal_plot(signal):
     fig = go.Figure()
-    fig.add_trace(
-        go.Scatter(
-            x=signal.time,
-            y=signal.data,
-            mode="lines",
-            name=signal.name
+
+    for sim_name, sig in cell.items():
+        fig.add_trace(
+            go.Scatter(
+                x=sig.time,
+                y=sig.data,
+                mode="lines",
+                name=sim_name,
+                line=dict(
+                    dash="solid" if sim_name == "ADAMS" else "dash"
+                )
+            )
         )
-    )
 
     fig.update_layout(
-        title=signal.name,
-        height=280,
+        title=title,
+        height=250,
         margin=dict(l=40, r=20, t=40, b=30),
-        showlegend=False
+        legend=dict(orientation="h")
     )
 
-    return dcc.Graph(
-        figure=fig,
-        config={"displayModeBar": False}
-    )
+    return dcc.Graph(figure=fig)
 
 
-# -------------------------------------------------
-# One LH/RH row for a plot type
-# -------------------------------------------------
-def lh_rh_row(title, lh_signal, rh_signal, metrics):
-
-    def metric_row(side):
-        return html.Div(
-            [
-                metric_block(k, v)
-                for k, v in metrics.items()
-                if k.startswith(side)
-            ],
-            style={"display": "flex", "gap": "10px", "marginTop": "5px"}
-        )
+def lh_rh_row(signal_name, front_lh, front_rh, rear_lh, rear_rh):
 
     return html.Div(
         [
-            html.H4(title, style={"marginBottom": "10px"}),
+            html.H3(signal_name),
 
+            html.H4("Front"),
             html.Div(
                 [
-                    # ---- LH ----
                     html.Div(
-                        [
-                            html.H5("LH"),
-                            signal_plot(lh_signal) if lh_signal else html.Div("No LH data"),
-                            metric_row("LH")
-                        ],
+                        [html.H5("LH"), overlay_plot(front_lh, "Front LH")],
                         style={"width": "48%"}
                     ),
-
-                    # ---- RH ----
                     html.Div(
-                        [
-                            html.H5("RH"),
-                            signal_plot(rh_signal) if rh_signal else html.Div("No RH data"),
-                            metric_row("RH")
-                        ],
+                        [html.H5("RH"), overlay_plot(front_rh, "Front RH")],
                         style={"width": "48%"}
-                    )
+                    ),
                 ],
-                style={
-                    "display": "flex",
-                    "justifyContent": "space-between",
-                    "marginBottom": "30px"
-                }
-            )
+                style={"display": "flex", "justifyContent": "space-between"}
+            ),
+
+            html.H4("Rear"),
+            html.Div(
+                [
+                    html.Div(
+                        [html.H5("LH"), overlay_plot(rear_lh, "Rear LH")],
+                        style={"width": "48%"}
+                    ),
+                    html.Div(
+                        [html.H5("RH"), overlay_plot(rear_rh, "Rear RH")],
+                        style={"width": "48%"}
+                    ),
+                ],
+                style={"display": "flex", "justifyContent": "space-between"}
+            ),
+
+            html.Hr()
         ]
     )
