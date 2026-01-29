@@ -1,12 +1,13 @@
 """
 data_provider.py
 
-Bridges PostProcess → Dash
-NO Dash imports here
+Adapts PostProcess + rich Signal metadata
+into a Dash-ready OAE structure.
 """
 
 from pathlib import Path
 from proc import PostProcess
+from collections import defaultdict
 import numpy as np
 
 # -------------------------------------------------
@@ -16,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA = ROOT / "data"
 
 # -------------------------------------------------
-# Helpers from your original script
+# Curve specification (UNCHANGED from demo)
 # -------------------------------------------------
 def add_force_signal(names):
     forces_temp = [
@@ -32,36 +33,28 @@ def add_force_signal(names):
     return forces
 
 
-# -------------------------------------------------
-# Curve specification (UNCHANGED LOGIC)
-# -------------------------------------------------
-fnames = ['HT', 'SP', 'RSU']
-
 curve_details = [
-    ('Vehicle_speed', 'I', None),
-    ('Front_travel', 'D', [0, 55, 85, 97]),
-    ('Rear_travel', 'D', [0, 32, 70, 82]),
+    ('Spring_length', 'D', 'L', 'F', None),
+    ('Spring_length', 'D', 'R', 'F', None),
+    ('Spring_length', 'D', 'L', 'R', None),
+    ('Spring_length', 'D', 'R', 'R', None),
+
+    ('FL_FX', 'F', 'L', 'F'),
+    ('FR_FX', 'F', 'R', 'F'),
+    ('RL_FX', 'F', 'L', 'R'),
+    ('RR_FX', 'F', 'R', 'R'),
 ]
 
-curve_details.extend(add_force_signal(fnames))
-curve_details.append(('CG_AZ', 'A', None))
-curve_details.extend([
-    ('FWC_X', 'IP', None),
-    ('FWC_Z', 'IP', None),
-    ('RWC_X', 'IP', None),
-    ('RWC_Z', 'IP', None),
-])
-
 # -------------------------------------------------
-# sim_info builder  ✅ OPTION 1 FIX
+# sim_info builder (Option 1 – contract preserved)
 # -------------------------------------------------
-def build_sim_info(name):
+def build_sim_info(name, abf_file):
     return {
-        'name': name,   # 👈 THIS FIXES YOUR ERROR
-        'abf_path': DATA / "bump_s400x80_20kph_double.csv",
-        'speed': 20,
+        'name': name,
+        'abf_path': DATA / abf_file,
+        'speed': 40.23,
         'road_path': DATA / "bump_s400x80.rdf",
-        'wheelbase': 1344,
+        'wheelbase': 2935,
         'Road_origin_FWC_offset': 1631.1578,
         'time_step': 0.001,
         'trim': None,
@@ -77,7 +70,7 @@ def build_sim_info(name):
     }
 
 # -------------------------------------------------
-# Run PostProcess (old script logic wrapped)
+# Run PostProcess (unchanged logic)
 # -------------------------------------------------
 def run_postprocess(sim_info):
     pp = PostProcess(sim_info)
@@ -87,52 +80,61 @@ def run_postprocess(sim_info):
     return pp
 
 # -------------------------------------------------
-# Build LH / RH plot rows from dtype_map
+# Metrics (expand later)
 # -------------------------------------------------
-def build_plots_from_dtype_map(dtype_map):
+def compute_metrics(signal):
+    return {
+        "RMS": f"{np.sqrt(np.mean(signal.data**2)):.3f}",
+        "Peak": f"{np.max(np.abs(signal.data)):.3f}"
+    }
 
-    plots = {}
+# -------------------------------------------------
+# Core grouping logic (THIS IS THE KEY PART)
+# -------------------------------------------------
+def build_plots_from_signals(signals):
+    """
+    Groups signals into:
+    plot_type → axle → LH/RH
+    """
 
-    for dtype, signals in dtype_map.items():
-        for sig in signals:
+    plots = defaultdict(lambda: {
+        "Front": {"LH": None, "RH": None},
+        "Rear": {"LH": None, "RH": None},
+        "metrics": defaultdict(dict)
+    })
 
-            plot_name = sig.name
-            side = sig.side.upper()   # LH / RH
+    for sig in signals:
+        plot_name = sig.name
+        side = "LH" if sig.side == "L" else "RH"
+        axle = "Front" if sig.axle == "F" else "Rear"
 
-            if plot_name not in plots:
-                plots[plot_name] = {
-                    "LH": None,
-                    "RH": None,
-                    "metrics": {}
-                }
+        plots[plot_name][axle][side] = sig
 
-            plots[plot_name][side] = sig
-
-            # Example metrics (expand later)
-            plots[plot_name]["metrics"][f"{side} RMS"] = f"{sig.rms:.2f}"
-            plots[plot_name]["metrics"][f"{side} Peak"] = f"{sig.peak:.2f}"
+        for k, v in compute_metrics(sig).items():
+            plots[plot_name]["metrics"][axle][f"{side} {k}"] = v
 
     return plots
 
 # -------------------------------------------------
 # Build one OAE block
 # -------------------------------------------------
-def build_oae(oae_name):
-    sim_info = build_sim_info(oae_name)
+def build_oae(name, abf_file):
+    sim_info = build_sim_info(name, abf_file)
     pp = run_postprocess(sim_info)
 
     return {
         "summary": {
-            "Name": sim_info["name"],
+            "Name": name,
             "Speed": f"{sim_info['speed']} km/h",
             "Signals": len(pp.signals)
         },
-        "plots": build_plots_from_dtype_map(pp.dtype_map)
+        "plots": build_plots_from_signals(pp.signals)
     }
 
 # -------------------------------------------------
-# PUBLIC OBJECT USED BY DASH
+# PUBLIC: OAES consumed by Dash
 # -------------------------------------------------
 OAES = {
-    "tanu": build_oae("tanu")
+    "Adams_CS100": build_oae("Adams_CS100", "Adams_CS100_bus.csv"),
+    "MV_CS100": build_oae("MV_CS100", "MV_CS100_bus.csv"),
 }
