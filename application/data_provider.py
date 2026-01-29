@@ -79,62 +79,46 @@ def run_postprocess(sim_info):
     pp.wc_path()
     return pp
 
-# -------------------------------------------------
-# Metrics (expand later)
-# -------------------------------------------------
-def compute_metrics(signal):
-    return {
-        "RMS": f"{np.sqrt(np.mean(signal.data**2)):.3f}",
-        "Peak": f"{np.max(np.abs(signal.data)):.3f}"
-    }
-
-# -------------------------------------------------
-# Core grouping logic (THIS IS THE KEY PART)
-# -------------------------------------------------
-def build_plots_from_signals(signals):
-    """
-    Groups signals into:
-    plot_type → axle → LH/RH
-    """
-
-    plots = defaultdict(lambda: {
-        "Front": {"LH": None, "RH": None},
-        "Rear": {"LH": None, "RH": None},
-        "metrics": defaultdict(dict)
-    })
-
-    for sig in signals:
-        plot_name = sig.name
-        side = "LH" if sig.side == "L" else "RH"
-        axle = "Front" if sig.axle == "F" else "Rear"
-
-        plots[plot_name][axle][side] = sig
-
-        for k, v in compute_metrics(sig).items():
-            plots[plot_name]["metrics"][axle][f"{side} {k}"] = v
-
-    return plots
-
-# -------------------------------------------------
-# Build one OAE block
-# -------------------------------------------------
-def build_oae(name, abf_file):
-    sim_info = build_sim_info(name, abf_file)
-    pp = run_postprocess(sim_info)
-
-    return {
-        "summary": {
-            "Name": name,
-            "Speed": f"{sim_info['speed']} km/h",
-            "Signals": len(pp.signals)
-        },
-        "plots": build_plots_from_signals(pp.signals)
-    }
-
-# -------------------------------------------------
-# PUBLIC: OAES consumed by Dash
-# -------------------------------------------------
-OAES = {
-    "Adams_CS100": build_oae("Adams_CS100", "Adams_CS100_bus.csv"),
-    "MV_CS100": build_oae("MV_CS100", "MV_CS100_bus.csv"),
+SIMS = {
+    "ADAMS": run_postprocess(
+        build_sim_info("ADAMS_CS100", "Adams_CS100_bus.csv")
+    ),
+    "MV": run_postprocess(
+        build_sim_info("MV_CS100", "MV_CS100_bus.csv")
+    )
 }
+
+# -------------------------------------------------
+# Build dtype-based OAEs with overlay support
+# -------------------------------------------------
+def build_dtype_oaes(simulations):
+    """
+    Returns:
+    OAES[dtype][signal_name][axle][side][sim_name] = Signal
+    """
+
+    oaes = defaultdict(
+        lambda: defaultdict(
+            lambda: {
+                "Front": {"LH": {}, "RH": {}},
+                "Rear":  {"LH": {}, "RH": {}},
+            }
+        )
+    )
+
+    for sim_name, pp in simulations.items():
+        for dtype, signals in pp.dtype_map.items():
+            for sig in signals:
+
+                signal_name = sig.name
+                side = "LH" if sig.side == "L" else "RH"
+                axle = "Front" if sig.axle == "F" else "Rear"
+
+                oaes[dtype][signal_name][axle][side][sim_name] = sig
+
+    return oaes
+
+# -------------------------------------------------
+# PUBLIC: dtype-based OAEs
+# -------------------------------------------------
+OAES = build_dtype_oaes(SIMS)
