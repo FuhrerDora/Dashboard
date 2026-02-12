@@ -1,0 +1,173 @@
+# dashboard/app.py
+
+from dash import Dash, dcc
+import dash_bootstrap_components as dbc
+
+from layout.header import build_header
+from layout.sidebar import build_sidebar
+from layout.router import build_router
+from state.stores import build_stores
+from load_models import load_models
+
+# Load backend models once
+MODELS = load_models()
+
+app = Dash(
+    __name__,
+    external_stylesheets=[dbc.themes.FLATLY],
+    suppress_callback_exceptions=True,
+)
+
+server = app.server
+
+app.layout = dbc.Container(
+    fluid=True,
+    children=[
+        build_stores(),
+        dcc.Location(id="url"),
+        build_header(),
+        dbc.Row(
+            [
+                dbc.Col(build_sidebar(MODELS), md=2),
+                dbc.Col(build_router(), md=10),
+            ],
+            className="gx-2",
+        ),
+    ],
+)
+
+# ---- Register Callbacks ----
+from callbacks.sidebar_callbacks import register_sidebar_callbacks
+from callbacks.routing_callbacks import register_routing_callbacks
+from callbacks.comparison_callbacks import register_comparison_callbacks
+
+register_sidebar_callbacks(app, MODELS)
+register_routing_callbacks(app)
+register_comparison_callbacks(app, MODELS)
+
+if __name__ == "__main__":
+    app.run_server(debug=True)
+
+import uuid
+import dash_bootstrap_components as dbc
+from dash import Input, Output, State
+
+
+def register_sidebar_callbacks(app, MODELS):
+
+    # ---- Toggle Modal ----
+    @app.callback(
+        Output("new-cmp-modal", "is_open"),
+        Input("btn-new-comparison", "n_clicks"),
+        Input("new-cmp-cancel", "n_clicks"),
+        Input("new-cmp-create", "n_clicks"),
+        State("new-cmp-modal", "is_open"),
+        prevent_initial_call=True,
+    )
+    def toggle_new_cmp(btn, cancel, create, is_open):
+        return not is_open
+
+
+    # ---- Create Comparison View ----
+    @app.callback(
+        Output("app-state", "data"),
+        Output("url", "pathname"),
+        Input("new-cmp-create", "n_clicks"),
+        State("new-cmp-target", "value"),
+        State("new-cmp-tests", "value"),
+        State("new-cmp-sim", "value"),
+        State("app-state", "data"),
+        prevent_initial_call=True,
+    )
+    def create_comparison(n, target, tests, sim, state):
+
+        if not target or not tests or not sim:
+            return state, None
+
+        view_id = f"view_{uuid.uuid4().hex[:6]}"
+
+        state["comparison_views"][view_id] = {
+            "target": target,
+            "tests": tests,
+            "sim": sim,
+        }
+
+        state["active_view"] = view_id
+
+        return state, f"/comparison/{view_id}"
+
+
+    # ---- Update Sidebar View List ----
+    @app.callback(
+        Output("comparison-view-list", "children"),
+        Input("app-state", "data"),
+    )
+    def update_sidebar_views(state):
+
+        views = state.get("comparison_views", {})
+
+        return [
+            dbc.ListGroupItem(
+                view_id,
+                href=f"/comparison/{view_id}",
+                action=True,
+            )
+            for view_id in views.keys()
+        ]
+
+
+from dash import Input, Output, html
+from layout.model_view import model_view_layout
+from layout.comparison_view import comparison_view_layout
+
+
+def register_routing_callbacks(app):
+
+    @app.callback(
+        Output("page-content", "children"),
+        Input("url", "pathname"),
+    )
+    def route(pathname):
+
+        if not pathname or pathname == "/":
+            return html.Div("Select a model or create a comparison.")
+
+        if pathname.startswith("/model/"):
+            model_name = pathname.split("/")[-1]
+            return model_view_layout(model_name)
+
+        if pathname.startswith("/comparison/"):
+            view_id = pathname.split("/")[-1]
+            return comparison_view_layout(view_id)
+
+        return html.Div("Page not found.")
+
+from dash import Input, Output
+
+
+def register_comparison_callbacks(app, MODELS):
+
+    @app.callback(
+        Output("new-cmp-target", "options"),
+        Output("new-cmp-tests", "options"),
+        Output("new-cmp-sim", "options"),
+        Input("btn-new-comparison", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def populate_new_cmp(_):
+
+        model_options = [{"label": m, "value": m} for m in MODELS.keys()]
+
+        if MODELS:
+            first_model = next(iter(MODELS.values()))
+            sim_options = [
+                {"label": s, "value": s}
+                for s in first_model.sims.keys()
+            ]
+        else:
+            sim_options = []
+
+        return model_options, model_options, sim_options
+
+
+
