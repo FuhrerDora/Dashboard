@@ -1,0 +1,76 @@
+from dash import Input, Output, State, html
+import dash_bootstrap_components as dbc
+
+from proc.analysis.load_profiles import LoadProfiles
+
+
+    @app.callback(
+        Output("loads-table-container", "children"),
+        Input("comparison-tabs", "active_tab"),
+        Input("url", "pathname"),
+        State("app-state", "data"),
+        prevent_initial_call=True,
+    )
+    def render_loads_table(active_tab, pathname, state):
+
+        print("LOADS CALLBACK FIRED")
+
+        if active_tab != "loads":
+            return ""
+
+        if not pathname.startswith("/comparison/"):
+            return ""
+
+        view_id = pathname.split("/")[-1]
+        view_data = state["comparison_views"][view_id]
+
+        target_name = view_data["target"]
+        test_names = view_data["tests"]
+        sim_name = view_data["sim"]
+
+        # IMPORTANT: access sims properly
+        target_sim = MODELS[target_name].sims[sim_name]
+
+        test_sims = {
+            name: MODELS[name].sims[sim_name]
+            for name in test_names
+        }
+
+        # Compute loads for target only (start simple)
+        lp = LoadProfiles([target_sim])
+        _, level_profiles = lp.compute()
+
+        if not level_profiles:
+            return html.Div("No load data available.")
+
+        levels = sorted(level_profiles.keys())
+        sig_names = sorted(next(iter(level_profiles.values())).keys())
+
+        header = [
+            html.Thead(
+                html.Tr(
+                    [html.Th("Signal")] +
+                    [html.Th(f"Level {lvl}") for lvl in levels]
+                )
+            )
+        ]
+
+        rows = []
+
+        for sig in sig_names:
+            row = [html.Td(sig)]
+            for lvl in levels:
+                value = level_profiles[lvl].get(sig, "")
+                row.append(html.Td(round(value, 3) if value else ""))
+
+            rows.append(html.Tr(row))
+
+        body = [html.Tbody(rows)]
+
+        return dbc.Table(
+            header + body,
+            bordered=True,
+            hover=True,
+            striped=True,
+            size="sm",
+        )
