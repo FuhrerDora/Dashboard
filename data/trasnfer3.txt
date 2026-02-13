@@ -1,0 +1,187 @@
+from dash import html, dcc
+import dash_bootstrap_components as dbc
+
+
+def comparison_view_layout(view_id, state, MODELS):
+
+    views = state.get("comparison_views", {})
+    view_data = views.get(view_id)
+
+    if not view_data:
+        return html.Div("Comparison not found")
+
+    title = view_data["name"]
+    target = view_data["target"]
+    tests = view_data["tests"]
+    sim = view_data["sim"]
+
+    target_model = MODELS[target]
+    sim_obj = target_model[sim]
+
+    # Collect dtypes dynamically
+    dtypes = sorted({sig.dtype for sig in sim_obj.signal_map.values()})
+
+    tabs = []
+
+    # ---- Default Loads Tab ----
+    tabs.append(
+        dbc.Tab(
+            label="Loads Table",
+            tab_id="loads",
+            children=html.Div(id="loads-table-container", className="mt-3")
+        )
+    )
+
+    # ---- Dynamic dtype tabs ----
+    for dtype in dtypes:
+        tabs.append(
+            dbc.Tab(
+                label=dtype,
+                tab_id=f"dtype-{dtype}",
+                children=html.Div(
+                    [
+                        # Filter Row
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    dcc.Checklist(
+                                        id={
+                                            "type": "dtype-filter-lat",
+                                            "dtype": dtype,
+                                        },
+                                        options=[{"label": "Lat", "value": "lat"}],
+                                        inline=True,
+                                    ),
+                                    width=2,
+                                ),
+                                dbc.Col(
+                                    dcc.Checklist(
+                                        id={
+                                            "type": "dtype-filter-axle",
+                                            "dtype": dtype,
+                                        },
+                                        options=[{"label": "Front", "value": "front"},
+                                                 {"label": "Rear", "value": "rear"}],
+                                        inline=True,
+                                    ),
+                                    width=3,
+                                ),
+                                dbc.Col(
+                                    dcc.Dropdown(
+                                        id={
+                                            "type": "metric-selector",
+                                            "dtype": dtype,
+                                        },
+                                        multi=True,
+                                        placeholder="Select metrics",
+                                    ),
+                                    width=3,
+                                ),
+                                dbc.Col(
+                                    dcc.Dropdown(
+                                        id={
+                                            "type": "sort-metric",
+                                            "dtype": dtype,
+                                        },
+                                        placeholder="Sort by metric",
+                                    ),
+                                    width=2,
+                                ),
+                            ],
+                            className="mb-3",
+                        ),
+
+                        # Content Row
+                        dbc.Row(
+                            [
+                                dbc.Col(
+                                    html.Div(
+                                        id={
+                                            "type": "plots-container",
+                                            "dtype": dtype,
+                                        }
+                                    ),
+                                    width=8,
+                                ),
+                                dbc.Col(
+                                    html.Div(
+                                        id={
+                                            "type": "metrics-container",
+                                            "dtype": dtype,
+                                        }
+                                    ),
+                                    width=4,
+                                ),
+                            ]
+                        ),
+                    ],
+                    className="mt-3",
+                ),
+            )
+        )
+
+    return html.Div(
+        [
+            html.H3(f"Comparison: {title}", className="mb-4"),
+
+            # Top Selector Card
+            dbc.Card(
+                dbc.CardBody(
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                dcc.Dropdown(
+                                    id="cmp-target-model",
+                                    options=[
+                                        {"label": m, "value": m}
+                                        for m in MODELS.keys()
+                                    ],
+                                    value=target,
+                                ),
+                                width=3,
+                            ),
+                            dbc.Col(
+                                dcc.Dropdown(
+                                    id="cmp-test-models",
+                                    options=[
+                                        {"label": m, "value": m}
+                                        for m in MODELS.keys()
+                                    ],
+                                    value=tests,
+                                    multi=True,
+                                ),
+                                width=3,
+                            ),
+                            dbc.Col(
+                                dcc.Dropdown(
+                                    id="cmp-sim",
+                                    options=[
+                                        {"label": s, "value": s}
+                                        for s in MODELS[target].sims.keys()
+                                    ],
+                                    value=sim,
+                                ),
+                                width=3,
+                            ),
+                            dbc.Col(
+                                dbc.Button(
+                                    "Run Comparison",
+                                    id="run-comparison-btn",
+                                    color="primary",
+                                ),
+                                width=2,
+                            ),
+                        ]
+                    )
+                ),
+                className="mb-4",
+            ),
+
+            # Tabs Section
+            dbc.Tabs(
+                tabs,
+                id="comparison-tabs",
+                active_tab="loads",
+            ),
+        ]
+    )
