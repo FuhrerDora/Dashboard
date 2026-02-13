@@ -1,0 +1,147 @@
+from collections import defaultdict
+from utils.sig_selector import sig_selector
+
+
+class LoadProfiles:
+
+    def __init__(self, model):
+        self.model = model
+
+    def compute(self, sig_names=None, sig_filters=None):
+
+        level_profiles = defaultdict(lambda: defaultdict(dict))
+
+        for sim in self.model:
+
+            level = sim.level
+
+            for sig_name, sig in sim.signal_map.items():
+
+                if not sig_selector(sig, sig_name,
+                                    sig_names=sig_names,
+                                    sig_filters=sig_filters):
+                    continue
+
+                # Collapse key: name + axle + side
+                base_key = f"{sig.name}_{sig.axle}_{sig.side}"
+
+                # Max magnitude rule
+                value = sig.max() if abs(sig.max()) >= abs(sig.min()) else sig.min()
+
+                prev = level_profiles[level].get(base_key)
+
+                if prev is None or abs(value) > abs(prev["value"]):
+                    level_profiles[level][base_key] = {
+                        "value": value,
+                        "comp": sig.comp
+                    }
+
+        return dict(level_profiles)
+
+
+from dash import html
+import dash_bootstrap_components as dbc
+
+
+def build_comparison_loads_table(target_model, test_models):
+
+    from proc.analysis.load_profiles import LoadProfiles
+
+    target_profiles = LoadProfiles(target_model).compute()
+
+    test_profiles = {
+        name: LoadProfiles(model).compute()
+        for name, model in test_models.items()
+    }
+
+    levels = sorted(target_profiles.keys())
+
+    # Collect signal keys
+    sig_names = set()
+    for lvl in levels:
+        sig_names.update(target_profiles[lvl].keys())
+
+    sig_names = sorted(sig_names)
+
+    header = html.Thead(
+        html.Tr(
+            [html.Th("Signal"), html.Th("Model")] +
+            [html.Th(f"Level {lvl}") for lvl in levels]
+        )
+    )
+
+    rows = []
+
+    for sig in sig_names:
+
+        model_rows = []
+
+        # ---- Target Row ----
+        target_cells = []
+
+        for lvl in levels:
+            data = target_profiles[lvl].get(sig)
+
+            if data:
+                target_cells.append(
+                    html.Td(
+                        f"{data['value']:.2f}",
+                        title=f"Comp: {data['comp']}"
+                    )
+                )
+            else:
+                target_cells.append(html.Td("-"))
+
+        model_rows.append(
+            html.Tr(
+                [html.Td("Target")] + target_cells
+            )
+        )
+
+        # ---- Test Model Rows ----
+        for model_name, profiles in test_profiles.items():
+
+            cells = []
+
+            for lvl in levels:
+                data = profiles[lvl].get(sig)
+
+                if data:
+                    cells.append(
+                        html.Td(
+                            f"{data['value']:.2f}",
+                            title=f"Comp: {data['comp']}"
+                        )
+                    )
+                else:
+                    cells.append(html.Td("-"))
+
+            model_rows.append(
+                html.Tr(
+                    [html.Td(model_name)] + cells
+                )
+            )
+
+        # Insert Signal Cell (rowSpan)
+        total_rows = len(model_rows)
+
+        model_rows[0].children.insert(
+            0,
+            html.Td(
+                sig,
+                rowSpan=total_rows,
+                style={"fontWeight": "bold"}
+            )
+        )
+
+        rows.extend(model_rows)
+
+    body = html.Tbody(rows)
+
+    return dbc.Table(
+        [header, body],
+        bordered=True,
+        striped=True,
+        hover=True,
+        responsive=True,
+    )
